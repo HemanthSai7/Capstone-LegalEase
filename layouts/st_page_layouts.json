@@ -1,0 +1,14 @@
+{
+  "home": {
+    "page_title": "LegalEase",
+    "layout": "wide",
+    "page_icon": "🏡",
+    "initial_sidebar_state": "expanded"
+  },
+  "bot": {
+    "page_title": "bot",
+    "layout": "wide",
+    "page_icon": "⚖️",
+    "initial_sidebar_state": "expanded"
+  }
+}
