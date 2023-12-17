@@ -1,4 +1,4 @@
-Model Name,Cosine Similarity,Bleau Score,Rouge score,Bert Score,
+Model Name,Cosine Similarity,Bleu Score,Rouge score,Bert Score,
 LLama-2,Mean Cosine Similarity: 0.35547265600665867,7.68E-232,"ROUGE Scores: {'rouge-1': {'r': 0.3414021279493459, 'p': 0.487660866691639, 'f': 0.39550724630260126}, 'rouge-2': {'r': 0.15936342394505792, 'p': 0.2394610883339853, 'f': 0.18767401190346056}, 'rouge-l': {'r': 0.3110684931158799, 'p': 0.4425861422796989, 'f': 0.3598492619893111}}","BERT Precision: 0.7935200929641724
 BERT Recall: 0.8620060682296753
 BERT F1 Score: 0.8262097239494324",2nd

@@ -24,9 +24,10 @@ def load_model_gpt3_5_turbo(retriever, memory):
         label="Temperature",
         min_value=0.0,
         max_value=1.0,
-        value=0.0,
+        value=0.3,
         step=0.01,
         key="temperature",
+
     )
 
     # Setup LLM and QA chain

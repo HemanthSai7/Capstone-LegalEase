@@ -58,6 +58,7 @@ def results():
     st.write("**Here are the results of the evaluation.**")
 
     df = pd.read_csv("results/Evaluation_Results.csv")
+    df["Bleu Score"]=df["Bleu Score"].astype(str)
     st.dataframe(df, hide_index=True)
 
 

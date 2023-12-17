@@ -1,6 +1,6 @@
-import streamlit as st
-
 from .models import *
+
+from sentence_transformers import util
 
 def evaluator(base_response, *responses):
     """
@@ -15,11 +15,17 @@ def evaluator(base_response, *responses):
 
     encoded_responses = embeddings.encode(responses, normalize_embeddings=True)
 
-    similarity = encoded_responses @ base_response_embedding.T
-    index = similarity.argmax()
+    dot_product_similarity = encoded_responses @ base_response_embedding.T
+    cosine_similarity = util.pytorch_cos_sim(encoded_responses, base_response_embedding)
 
-    return responses[index], similarity[index], index, similarity
+    dot_product_index = dot_product_similarity.argmax()
+    cosine_similarity_index = cosine_similarity.argmax().item()
 
-
-# kjfdhbaskjf=evaluator("Hello", "hi", "hello", "hey")
-# print(kjfdhbaskjf)
+    return (
+        responses[cosine_similarity_index],
+        cosine_similarity[cosine_similarity_index],
+        dot_product_similarity[dot_product_index],
+        cosine_similarity_index,
+        dot_product_similarity,
+        cosine_similarity,
+    )

@@ -70,16 +70,48 @@ if user_query := st.chat_input(placeholder="Ask me anything!"):
         user_query, callbacks=[retrieval_handler, stream_handler]
     )
 
-    response, score, index, similarity = evaluator(
-        response_gpt3, response_mistral, response_falcon, response_llama2
-    )
+    (
+        response,
+        cosine_similarity_score,
+        dot_product_score,
+        index,
+        dot_product_similarity,
+        cosine_similarity,
+    ) = evaluator(response_gpt3, response_mistral, response_falcon, response_llama2)
 
-    # st.write(f"Reponse: {response_mistral}")
-    # st.write(f" handler: {retrieval_handler}")
     models = ["Mistral", "Falcon", "Llama2"]
     with st.chat_message(f"{models[index]}"):
         st.write(models[index])
-        st.write(f"Score: {score}")
+        st.write(f"Cosine Similarity: {cosine_similarity_score}")
         st.write(f"Index: {index}")
         st.write(f"Reponse: {response}")
-        
+
+        fig, ax = plt.subplots()
+        ax.plot([0, 1], [0, dot_product_similarity[0]], color="red", label="Mistral")
+        ax.plot([0, 2], [0, dot_product_similarity[1]], color="green", label="Falcon")
+        ax.plot([0, 3], [0, dot_product_similarity[2]], color="blue", label="Llama2")
+        ax.legend()
+        ax.set_xlabel("Models")
+        ax.set_ylabel("Similarity")
+        ax.set_title("Cosine  Similarity")
+        ax.set_ylim([0, 1])
+        ax.annotate(
+            f"Score: {dot_product_similarity[0]}",
+            xy=( 1, dot_product_similarity[0]),
+            xytext=(1, dot_product_similarity[0] + 0.1),
+            arrowprops=dict(facecolor="black", shrink=0.05),
+        )
+        ax.annotate(
+            f"Score: {dot_product_similarity[1]}",
+            xy=(2, dot_product_similarity[1]),
+            xytext=(2, dot_product_similarity[1] + 0.1),
+            arrowprops=dict(facecolor="black", shrink=0.05),
+        )
+        ax.annotate(
+            f"Score: {dot_product_similarity[2]}",
+            xy=(3, dot_product_similarity[2]),
+            xytext=(3, dot_product_similarity[2] + 0.1),
+            arrowprops=dict(facecolor="black", shrink=0.05),
+        )
+
+        st.pyplot(fig)
