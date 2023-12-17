@@ -1,130 +1,18 @@
-import os
-import tempfile
+import numpy as np
+import pandas as pd
 import streamlit as st
+import matplotlib.pyplot as plt
+
 from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import PyPDFLoader
 from langchain.memory import ConversationBufferMemory
 from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain.chains import ConversationalRetrievalChain
-from langchain.vectorstores import DocArrayInMemorySearch
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.llms import Clarifai
+
+from utils import configure_retriever, PrintRetrievalHandler, StreamHandler
+from utils import *
+
 
 st.set_page_config(page_title="LegalEase", page_icon="⚖️")
 st.title("⚖️ LegalEase")
-
-
-@st.cache_resource(ttl="1h")
-def configure_retriever(uploaded_files):
-    # Read documents
-    docs = []
-    temp_dir = tempfile.TemporaryDirectory()
-    for file in uploaded_files:
-        temp_filepath = os.path.join(temp_dir.name, file.name)
-        with open(temp_filepath, "wb") as f:
-            f.write(file.getvalue())
-        loader = PyPDFLoader(temp_filepath)
-        docs.extend(loader.load())
-
-    # Split documents
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=256)
-    splits = text_splitter.split_documents(docs)
-
-    # Create embeddings and store in vectordb
-    embeddings = HuggingFaceEmbeddings(model_name="BAAI/llm-embedder")
-    vectordb = DocArrayInMemorySearch.from_documents(splits, embeddings)
-
-    # Define retriever
-    retriever = vectordb.as_retriever(
-        search_type="mmr", search_kwargs={"k": 2, "fetch_k": 4}
-    )
-
-    return retriever
-
-
-class StreamHandler(BaseCallbackHandler):
-    def __init__(
-        self, container: st.delta_generator.DeltaGenerator, initial_text: str = ""
-    ):
-        self.container = container
-        self.text = initial_text
-        self.run_id_ignore_token = None
-
-    def on_llm_start(self, serialized: dict, prompts: list, **kwargs):
-        # Workaround to prevent showing the rephrased question as output
-        if prompts[0].startswith("Human"):
-            self.run_id_ignore_token = kwargs.get("run_id")
-
-    def on_llm_new_token(self, token: str, **kwargs) -> None:
-        if self.run_id_ignore_token == kwargs.get("run_id", False):
-            return
-        self.text += token
-        self.container.markdown(self.text)
-
-
-class PrintRetrievalHandler(BaseCallbackHandler):
-    def __init__(self, container):
-        self.status = container.status("**Context Retrieval**")
-
-    def on_retriever_start(self, serialized: dict, query: str, **kwargs):
-        self.status.write(f"**Question:** {query}")
-        self.status.update(label=f"**Context Retrieval:** {query}")
-
-    def on_retriever_end(self, documents, **kwargs):
-        for idx, doc in enumerate(documents):
-            source = os.path.basename(doc.metadata["source"])
-            self.status.write(f"**Document {idx} from {source}**")
-            self.status.markdown(doc.page_content)
-        self.status.update(state="complete")
-
-
-choice = st.sidebar.radio(
-    label="Select the model you want to use",
-    options=["Mistral-7B", "gpt-3.5-turbo", "Falcon-40B"],
-)
-
-if choice == "gpt-3.5-turbo":
-    openai_api_key = st.sidebar.text_input("OpenAI API Key", type="password")
-    if not openai_api_key:
-        st.info("Please add your OpenAI API key to continue.")
-        st.stop()
-
-        # Setup LLM and QA chain
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo",
-        openai_api_key=openai_api_key,
-        temperature=0,
-        streaming=True,
-    )
-
-    temperature = st.sidebar.slider(
-        label="Temperature",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.0,
-        step=0.01,
-        key="temperature",
-    )
-
-if choice == "Mistral-7B":
-    llm = Clarifai(
-        pat=os.getenv("CLARIFAI_PAT"),
-        user_id=os.getenv("USER_ID"),
-        app_id=os.getenv("APP_ID"),
-        model_id=os.getenv("MODEL_ID"),
-        model_version_id=os.getenv("MODEL_VERSION_ID"),
-    )
-
-if choice == "Falcon-40B":
-    llm = Clarifai(
-        pat=os.getenv("FALCON_CLARIFAI_PAT"),
-        user_id=os.getenv("FALCON_USER_ID"),
-        app_id=os.getenv("FALCON_APP_ID"),
-        model_id=os.getenv("FALCON_MODEL_ID"),
-        model_version_id=os.getenv("FALCON_MODEL_VERSION_ID"),
-    )
 
 uploaded_files = st.sidebar.file_uploader(
     label="Upload PDF files", type=["pdf"], accept_multiple_files=True
@@ -137,14 +25,23 @@ retriever = configure_retriever(uploaded_files)
 
 # Setup memory for contextual conversation
 msgs = StreamlitChatMessageHistory()
-memory = ConversationBufferMemory(
+gpt3_memory = ConversationBufferMemory(
+    memory_key="chat_history", chat_memory=msgs, return_messages=True
+)
+mistral_memory = ConversationBufferMemory(
+    memory_key="chat_history", chat_memory=msgs, return_messages=True
+)
+falcon_memory = ConversationBufferMemory(
+    memory_key="chat_history", chat_memory=msgs, return_messages=True
+)
+llama_memory = ConversationBufferMemory(
     memory_key="chat_history", chat_memory=msgs, return_messages=True
 )
 
-
-qa_chain = ConversationalRetrievalChain.from_llm(
-    llm, retriever=retriever, memory=memory, verbose=True
-)
+qa_chain_gpt3_5_turbo = load_model_gpt3_5_turbo(retriever, gpt3_memory)
+qa_chain_mistral = load_model_mistral(retriever, mistral_memory)
+qa_chain_falcon = load_model_falcon(retriever, falcon_memory)
+qa_chain_llama2 = load_model_mistral(retriever, llama_memory)
 
 if len(msgs.messages) == 0 or st.sidebar.button("Clear message history"):
     msgs.clear()
@@ -157,9 +54,36 @@ for msg in msgs.messages:
 if user_query := st.chat_input(placeholder="Ask me anything!"):
     st.chat_message("user").write(user_query)
 
-    with st.chat_message("assistant"):
-        retrieval_handler = PrintRetrievalHandler(st.container())
-        stream_handler = StreamHandler(st.empty())
-        response = qa_chain.run(
-            user_query, callbacks=[retrieval_handler, stream_handler]
+    retrieval_handler = PrintRetrievalHandler(st.container())
+    stream_handler = StreamHandler(st.empty())
+
+    response_gpt3 = qa_chain_gpt3_5_turbo.run(
+        user_query, callbacks=[retrieval_handler, stream_handler]
+    )
+    response_mistral = qa_chain_mistral.run(
+        user_query, callbacks=[retrieval_handler, stream_handler]
+    )
+    response_falcon = qa_chain_falcon.run(
+        user_query, callbacks=[retrieval_handler, stream_handler]
+    )
+    response_llama2 = qa_chain_llama2.run(
+        user_query, callbacks=[retrieval_handler, stream_handler]
+    )
+
+    response, score, index, similarity = evaluator(
+        response_gpt3, response_mistral, response_falcon, response_llama2
+    )
+
+    # st.write(f"Reponse: {response_mistral}")
+    # st.write(f" handler: {retrieval_handler}")
+    models = ["GPT3", "Mistral", "Falcon", "Llama2"]
+    with st.chat_message(f"{models[index]}"):
+        st.write(models[index])
+        st.write(f"Score: {score}")
+        st.write(f"Index: {index}")
+        st.write(f"Reponse: {response}")
+        # similarity = np.array(similarity).reshape(1, 3)
+        df = pd.DataFrame(similarity, columns=["GPT3","Mistral", "Falcon", "Llama2"])
+        st.scatter_chart(
+            df, x="GPT3", y=["Mistral", "Falcon", "Llama2"], use_container_width=True
         )
