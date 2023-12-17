@@ -4,6 +4,7 @@ langchain
 sentence_transformers
 pandas
 numpy
+pydantic==1.10.9
 matplotlib
 python-dotenv
 pypdf
