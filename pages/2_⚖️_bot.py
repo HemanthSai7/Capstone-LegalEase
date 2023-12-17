@@ -76,14 +76,10 @@ if user_query := st.chat_input(placeholder="Ask me anything!"):
 
     # st.write(f"Reponse: {response_mistral}")
     # st.write(f" handler: {retrieval_handler}")
-    models = ["GPT3", "Mistral", "Falcon", "Llama2"]
+    models = ["Mistral", "Falcon", "Llama2"]
     with st.chat_message(f"{models[index]}"):
         st.write(models[index])
         st.write(f"Score: {score}")
         st.write(f"Index: {index}")
         st.write(f"Reponse: {response}")
-        # similarity = np.array(similarity).reshape(1, 3)
-        df = pd.DataFrame(similarity, columns=["GPT3","Mistral", "Falcon", "Llama2"])
-        st.scatter_chart(
-            df, x="GPT3", y=["Mistral", "Falcon", "Llama2"], use_container_width=True
-        )
+        
